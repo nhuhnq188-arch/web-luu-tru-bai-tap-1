@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Exercises - Cloud Storage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap");
+      body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background-color: #f8fafc;
+      }
+      .folder-card {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .folder-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      }
+      .gradient-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      }
+      .action-container {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        z-index: 40;
+        display: flex;
+        gap: 0.25rem;
+      }
+      .btn-action-round {
+        padding: 0.5rem;
+        background-color: #f1f5f9;
+        border-radius: 9999px;
+        color: #94a3b8;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+      .btn-action-round:hover {
+        background-color: #fee2e2;
+        color: #ef4444;
+        transform: scale(1.1);
+      }
+      .btn-edit:hover {
+        background-color: #dbeafe;
+        color: #2563eb;
+      }
+      #loading-overlay {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-blur: 4px;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen pb-20">
+    <!-- Loading Indicator -->
+    <div
+      id="loading-overlay"
+      class="fixed inset-0 z-[200] flex items-center justify-center"
+    >
+      <div class="flex flex-col items-center">
+        <div
+          class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"
+        ></div>
+        <p class="text-slate-600 font-medium">Đang đồng bộ dữ liệu...</p>
+      </div>
+    </div>
+
+    <header class="gradient-header text-white shadow-xl sticky top-0 z-50">
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+      >
+        <div>
+          <h1 class="text-2xl font-extrabold tracking-tight">
+            Interactive Exercises
+          </h1>
+          <nav class="flex mt-1 text-xs text-slate-400 gap-2">
+            <button
+              onclick="goHome()"
+              class="hover:text-blue-400 text-blue-400"
+            >
+              Trang chủ
+            </button>
+            <span id="breadcrumbPath" class="hidden"
+              >/ <span id="currentSubjectName"></span
+            ></span>
+          </nav>
+        </div>
+        <button
+          onclick="openModal()"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span id="addBtnText">Thêm Môn Học</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div id="subjectView">
+        <div
+          id="subjectGrid"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        ></div>
+      </div>
+      <div id="exerciseView" class="hidden">
+        <div
+          id="exerciseGrid"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+        ></div>
+        <div
+          id="emptyExercises"
+          class="hidden text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200"
+        >
+          <p class="text-slate-500">Chưa có trò chơi nào.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modals -->
+    <div
+      id="modal"
+      class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
+        <h2 id="modalTitle" class="text-2xl font-bold text-slate-800 mb-6">
+          Thêm Môn Học
+        </h2>
+        <div id="formSubject" class="space-y-4">
+          <input
+            type="text"
+            id="newSubjectName"
+            placeholder="Tên môn học"
+            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onclick="addSubject()"
+            class="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700"
+          >
+            Tạo mới
+          </button>
+        </div>
+        <div id="formExercise" class="hidden space-y-4">
+          <input type="hidden" id="editExIndex" value="-1" />
+          <input
+            type="text"
+            id="exTitle"
+            placeholder="Tên bài tập"
+            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="url"
+            id="exLink"
+            placeholder="URL trò chơi"
+            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <textarea
+            id="exNote"
+            rows="3"
+            placeholder="Ghi chú"
+            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+          ></textarea>
+          <button
+            onclick="handleExerciseSubmit()"
+            class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700"
+          >
+            Lưu lại
+          </button>
+        </div>
+        <button
+          onclick="closeModal()"
+          class="w-full mt-3 text-slate-400 text-sm hover:text-slate-600"
+        >
+          Hủy bỏ
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="confirmModal"
+      class="hidden fixed inset-0 z-[110] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center"
+      >
+        <div
+          class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-8 w-8"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Xác nhận xóa?</h3>
+        <p id="confirmMessage" class="text-slate-500 mb-6 text-sm"></p>
+        <div class="flex gap-3">
+          <button
+            onclick="closeConfirmModal()"
+            class="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl"
+          >
+            Hủy
+          </button>
+          <button
+            id="confirmDeleteBtn"
+            class="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl"
+          >
+            Xóa ngay
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getFirestore,
+        doc,
+        setDoc,
+        onSnapshot,
+        collection,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        signInWithCustomToken,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+      // CẤU HÌNH FIREBASE
+      const firebaseConfig =
+        typeof __firebase_config !== "undefined"
+          ? JSON.parse(__firebase_config)
+          : {
+              apiKey: "AIzaSyBgE2TGe9TvYPTRN-63zQc2Llmo46p8KCs",
+              authDomain: "website-lu.firebaseapp.com",
+              projectId: "website-lu",
+              storageBucket: "website-lu.firebasestorage.app",
+              messagingSenderId: "654362311627",
+              appId: "1:654362311627:web:64ead4c46dc943f23dd44e",
+              measurementId: "G-PNMMBRCB2L",
+            };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
+      const appId =
+        typeof __app_id !== "undefined" ? __app_id : "my-exercise-vault";
+
+      let data = [];
+      let currentSubjectIndex = null;
+      let deleteCallback = null;
+      let user = null;
+
+      // AUTHENTICATION
+      const initAuth = async () => {
+        try {
+          if (
+            typeof __initial_auth_token !== "undefined" &&
+            __initial_auth_token
+          ) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (err) {
+          console.error("Auth error:", err);
+        }
+      };
+
+      onAuthStateChanged(auth, (u) => {
+        user = u;
+        if (user) {
+          setupDataListener();
+        }
+      });
+
+      initAuth();
+
+      // FIRESTORE SYNC
+      function setupDataListener() {
+        // SỬA LỖI: Đường dẫn Document phải có số lượng phân đoạn chẵn (6 phân đoạn ở đây)
+        const docRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "user_content",
+          "vault",
+        );
+
+        onSnapshot(
+          docRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              data = docSnap.data().items || [];
+            } else {
+              data = [];
+            }
+            document.getElementById("loading-overlay").classList.add("hidden");
+            window.render();
+          },
+          (error) => {
+            console.error("Firestore Error:", error);
+            document.getElementById("loading-overlay").classList.add("hidden");
+          },
+        );
+      }
+
+      async function syncData() {
+        if (!user) return;
+        const docRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "user_content",
+          "vault",
+        );
+        try {
+          await setDoc(docRef, { items: data });
+        } catch (err) {
+          console.error("Sync error:", err);
+        }
+      }
+
+      // UI LOGIC
+      window.render = () => {
+        if (currentSubjectIndex === null) window.showSubjectView();
+        else window.showExerciseView();
+      };
+
+      window.showSubjectView = () => {
+        document.getElementById("subjectView").classList.remove("hidden");
+        document.getElementById("exerciseView").classList.add("hidden");
+        document.getElementById("breadcrumbPath").classList.add("hidden");
+        document.getElementById("addBtnText").innerText = "Thêm Môn Học";
+
+        const grid = document.getElementById("subjectGrid");
+        grid.innerHTML = "";
+        data.forEach((s, index) => {
+          const card = document.createElement("div");
+          card.className =
+            "folder-card bg-white p-6 rounded-2xl border border-slate-200 group shadow-sm relative overflow-hidden h-48 flex items-center justify-center cursor-pointer";
+          card.innerHTML = `
+                    <div class="flex flex-col items-center text-center w-full">
+                        <div class="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-amber-500" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-lg">${s.name}</h3>
+                        <p class="text-slate-400 text-xs mt-1">${s.exercises.length} bài tập</p>
+                    </div>
+                    <div class="action-container opacity-0 group-hover:opacity-100"><button class="btn-action-round del-subject-btn"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>
+                `;
+          card.addEventListener("click", (e) => {
+            if (!e.target.closest(".action-container"))
+              window.enterSubject(index);
+          });
+          card
+            .querySelector(".del-subject-btn")
+            .addEventListener("click", (e) => {
+              e.stopPropagation();
+              window.triggerConfirm(`Xóa môn "${s.name}"?`, () => {
+                data.splice(index, 1);
+                syncData();
+              });
+            });
+          grid.appendChild(card);
+        });
+      };
+
+      window.showExerciseView = () => {
+        document.getElementById("subjectView").classList.add("hidden");
+        document.getElementById("exerciseView").classList.remove("hidden");
+        document.getElementById("breadcrumbPath").classList.remove("hidden");
+        const subject = data[currentSubjectIndex];
+        if (!subject) {
+          window.goHome();
+          return;
+        }
+        document.getElementById("currentSubjectName").innerText = subject.name;
+        document.getElementById("addBtnText").innerText = "Thêm Trò Chơi";
+        const grid = document.getElementById("exerciseGrid");
+        const emptyState = document.getElementById("emptyExercises");
+        grid.innerHTML = "";
+        if (subject.exercises.length === 0) {
+          grid.classList.add("hidden");
+          emptyState.classList.remove("hidden");
+        } else {
+          grid.classList.remove("hidden");
+          emptyState.classList.add("hidden");
+          subject.exercises.forEach((ex, index) => {
+            const card = document.createElement("div");
+            card.className =
+              "bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col hover:shadow-md relative group";
+            card.innerHTML = `
+                        <div class="flex justify-between items-start mb-4">
+                             <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
+                             </div>
+                             <div class="flex gap-1">
+                                 <button class="btn-action-round btn-edit !p-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                                 <button class="btn-action-round btn-delete !p-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                             </div>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-1">${ex.title}</h3>
+                        <div class="bg-slate-50 p-3 rounded-lg mb-6 flex-1 line-clamp-3 text-slate-500 text-sm">${ex.note || "..."}</div>
+                        <a href="${ex.link}" target="_blank" class="w-full py-3 bg-slate-900 text-white text-center font-bold rounded-xl">Bắt đầu chơi</a>
+                    `;
+            card.querySelector(".btn-edit").onclick = (e) => {
+              e.stopPropagation();
+              window.editExercise(index);
+            };
+            card.querySelector(".btn-delete").onclick = (e) => {
+              e.stopPropagation();
+              window.triggerConfirm(`Xóa bài tập "${ex.title}"?`, () => {
+                data[currentSubjectIndex].exercises.splice(index, 1);
+                syncData();
+              });
+            };
+            grid.appendChild(card);
+          });
+        }
+      };
+
+      window.triggerConfirm = (msg, callback) => {
+        document.getElementById("confirmMessage").innerText = msg;
+        document.getElementById("confirmModal").classList.remove("hidden");
+        deleteCallback = callback;
+      };
+
+      window.closeConfirmModal = () => {
+        document.getElementById("confirmModal").classList.add("hidden");
+        deleteCallback = null;
+      };
+      document
+        .getElementById("confirmDeleteBtn")
+        .addEventListener("click", () => {
+          if (deleteCallback) deleteCallback();
+          window.closeConfirmModal();
+        });
+
+      window.enterSubject = (index) => {
+        currentSubjectIndex = index;
+        window.render();
+      };
+      window.goHome = () => {
+        currentSubjectIndex = null;
+        window.render();
+      };
+      window.closeModal = () => {
+        document.getElementById("modal").classList.add("hidden");
+      };
+
+      window.openModal = (isEdit = false, index = -1) => {
+        document.getElementById("modal").classList.remove("hidden");
+        if (currentSubjectIndex === null) {
+          document.getElementById("modalTitle").innerText = "Thêm Môn Học";
+          document.getElementById("formSubject").classList.remove("hidden");
+          document.getElementById("formExercise").classList.add("hidden");
+        } else {
+          document.getElementById("modalTitle").innerText = isEdit
+            ? "Sửa Bài Tập"
+            : "Thêm Bài Tập";
+          document.getElementById("formSubject").classList.add("hidden");
+          document.getElementById("formExercise").classList.remove("hidden");
+          if (isEdit) {
+            const ex = data[currentSubjectIndex].exercises[index];
+            document.getElementById("exTitle").value = ex.title;
+            document.getElementById("exLink").value = ex.link;
+            document.getElementById("exNote").value = ex.note;
+            document.getElementById("editExIndex").value = index;
+          } else {
+            document.getElementById("exTitle").value = "";
+            document.getElementById("exLink").value = "";
+            document.getElementById("exNote").value = "";
+            document.getElementById("editExIndex").value = -1;
+          }
+        }
+      };
+
+      window.addSubject = () => {
+        const val = document.getElementById("newSubjectName").value.trim();
+        if (val) {
+          data.push({ name: val, exercises: [] });
+          syncData();
+          window.closeModal();
+        }
+      };
+
+      window.handleExerciseSubmit = () => {
+        const title = document.getElementById("exTitle").value.trim();
+        const link = document.getElementById("exLink").value.trim();
+        const note = document.getElementById("exNote").value.trim();
+        const idx = parseInt(document.getElementById("editExIndex").value);
+        if (!title || !link) return;
+        const newEx = {
+          title,
+          link: link.startsWith("http") ? link : "https://" + link,
+          note,
+        };
+        if (idx > -1) data[currentSubjectIndex].exercises[idx] = newEx;
+        else data[currentSubjectIndex].exercises.unshift(newEx);
+        syncData();
+        window.closeModal();
+      };
+
+      window.editExercise = (index) => window.openModal(true, index);
+    </script>
+  </body>
+</html>
